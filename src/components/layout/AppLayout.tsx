@@ -1,5 +1,5 @@
 import React from 'react';
-import { Outlet, NavLink, useLocation } from 'react-router-dom';
+import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { 
   LayoutDashboard, 
   GitBranch, 
@@ -14,10 +14,15 @@ import {
   Bell,
   UploadCloud,
   RotateCcw,
-  Check
+  Check,
+  LogOut,
+  Shield,
+  ClipboardList
 } from 'lucide-react';
 import DemoBanner from './DemoBanner';
 import { usePatientRecord } from '@/context/PatientRecordContext';
+import { useAuth } from '@/auth/AuthProvider';
+import { auditLog } from '@/services/auditLog';
 
 const navItems = [
   { path: '/', label: 'Dashboard', icon: LayoutDashboard },
@@ -28,22 +33,59 @@ const navItems = [
   { path: '/medications', label: 'Medications', icon: Pill },
   { path: '/symptoms', label: 'Symptoms', icon: Activity },
   { path: '/nutrition', label: 'Nutrition', icon: Apple },
+  { path: '/privacy', label: 'Privacy & Access', icon: Shield },
+  { path: '/audit', label: 'Audit Log', icon: ClipboardList },
   { path: '/doctor-mode', label: 'Doctor Mode', icon: Stethoscope },
   { path: '/senior-mode', label: 'Senior Mode', icon: Heart },
 ];
 
 export default function AppLayout() {
   const location = useLocation();
+  const navigate = useNavigate();
   const currentNav = navItems.find(item => item.path === location.pathname) || navItems[0];
   const { patient, resetToBaseline } = usePatientRecord();
+  const { authState, logout } = useAuth();
   const [showResetConfirm, setShowResetConfirm] = React.useState(false);
   const [resetToast, setResetToast] = React.useState(false);
 
   const handleConfirmReset = () => {
     resetToBaseline();
+    auditLog.logAuditEvent({
+      action: 'PATIENT_DATA_RESET',
+      userId: authState.user?.id || 'u1',
+      userRole: authState.user?.role || 'PATIENT',
+      userName: authState.user?.displayName || patient.name,
+      targetResource: `Patient/${patient.id}`,
+      targetPatientId: patient.id,
+      outcome: 'success',
+      details: `Restored baseline synthetic patient dataset for ${patient.name}`
+    });
     setShowResetConfirm(false);
     setResetToast(true);
     setTimeout(() => setResetToast(false), 3500);
+  };
+
+  const handleLogout = () => {
+    if (authState.user) {
+      auditLog.logAuditEvent({
+        action: 'LOGOUT',
+        userId: authState.user.id,
+        userRole: authState.user.role,
+        userName: authState.user.displayName,
+        targetResource: 'Auth/Session',
+        outcome: 'success',
+        details: `User ${authState.user.username} logged out`
+      });
+    }
+    logout();
+    navigate('/login');
+  };
+
+  const roleColorMap: Record<string, string> = {
+    PATIENT: 'bg-blue-100 text-blue-700 border-blue-200',
+    DOCTOR: 'bg-emerald-100 text-emerald-700 border-emerald-200',
+    CAREGIVER: 'bg-purple-100 text-purple-700 border-purple-200',
+    ADMIN: 'bg-red-100 text-red-700 border-red-200',
   };
 
   return (
@@ -83,16 +125,31 @@ export default function AppLayout() {
           </nav>
 
           <div className="p-4 border-t border-gray-200">
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-bold">
-                {patient.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-3 min-w-0">
+                <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-bold flex-shrink-0">
+                  {(authState.user?.displayName || patient.name).split(' ').map(n => n[0]).join('').slice(0, 2)}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-gray-900 truncate" title={authState.user?.displayName || patient.name}>
+                    {authState.user?.displayName || patient.name}
+                  </p>
+                  <div className="flex items-center gap-1.5 mt-0.5">
+                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider border ${
+                      roleColorMap[authState.user?.role || 'PATIENT'] || 'bg-gray-100 text-gray-700 border-gray-200'
+                    }`}>
+                      {authState.user?.role || 'PATIENT'}
+                    </span>
+                  </div>
+                </div>
               </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-900 truncate">
-                  {patient.name}
-                </p>
-                <p className="text-xs text-gray-500 truncate">Patient</p>
-              </div>
+              <button
+                onClick={handleLogout}
+                title="Sign out of CareGraph"
+                className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors flex-shrink-0"
+              >
+                <LogOut className="w-4 h-4" />
+              </button>
             </div>
           </div>
         </aside>

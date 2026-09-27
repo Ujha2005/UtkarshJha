@@ -28,6 +28,7 @@ import {
   demoDoctors,
   buildHealthGraph
 } from '@/data/patient';
+import { auditLog } from '@/services/auditLog';
 
 interface PatientRecordContextType {
   patient: typeof demoPatient;
@@ -108,6 +109,16 @@ export const PatientRecordProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const addIngestedDocument = useCallback((doc: IngestedDocument) => {
     setIngestedDocuments(prev => [doc, ...prev]);
+    auditLog.logAuditEvent({
+      action: 'DOCUMENT_UPLOAD',
+      userId: 'u1',
+      userRole: 'PATIENT',
+      userName: 'Rajesh Kumar Sharma',
+      targetResource: `Document/${doc.id}`,
+      targetPatientId: 'p1',
+      outcome: 'success',
+      details: `Uploaded medical document "${doc.name}" for entity extraction (${doc.category})`
+    });
   }, []);
 
   const updateEntityReviewStatus = useCallback(
@@ -123,6 +134,17 @@ export const PatientRecordProvider: React.FC<{ children: React.ReactNode }> = ({
           };
         })
       );
+
+      auditLog.logAuditEvent({
+        action: status === 'rejected' ? 'ENTITY_REJECT' : 'ENTITY_ACCEPT',
+        userId: 'u1',
+        userRole: 'PATIENT',
+        userName: 'Rajesh Kumar Sharma',
+        targetResource: `Entity/${entityId}`,
+        targetPatientId: 'p1',
+        outcome: 'success',
+        details: `Updated extracted clinical entity review status to "${status}"`
+      });
     },
     []
   );
@@ -140,6 +162,17 @@ export const PatientRecordProvider: React.FC<{ children: React.ReactNode }> = ({
           };
         })
       );
+
+      auditLog.logAuditEvent({
+        action: 'ENTITY_EDIT',
+        userId: 'u1',
+        userRole: 'PATIENT',
+        userName: 'Rajesh Kumar Sharma',
+        targetResource: `Entity/${entityId}`,
+        targetPatientId: 'p1',
+        outcome: 'success',
+        details: `Edited clinical entity attributes manually before commit`
+      });
     },
     []
   );
@@ -258,6 +291,18 @@ export const PatientRecordProvider: React.FC<{ children: React.ReactNode }> = ({
       setIngestedDocuments(prev =>
         prev.map(d => (d.id === docId ? { ...d, status: 'committed' as const } : d))
       );
+
+      // Audit log commit action
+      auditLog.logAuditEvent({
+        action: 'DOCUMENT_COMMIT',
+        userId: 'u1',
+        userRole: 'PATIENT',
+        userName: 'Rajesh Kumar Sharma',
+        targetResource: `Document/${docId}`,
+        targetPatientId: 'p1',
+        outcome: 'success',
+        details: `Committed ${acceptedEntities.length} verified clinical entities into primary record. Sourced report: ${newReportId}`
+      });
 
       return {
         committedCount: acceptedEntities.length,
