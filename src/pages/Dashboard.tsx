@@ -14,18 +14,10 @@ import {
   Droplet
 } from 'lucide-react';
 import { usePatientRecord } from '@/context/PatientRecordContext';
-import {
-  demoAllergies,
-  demoDoctors
-} from '@/data/patient';
 import { LineChart, Line, ResponsiveContainer, YAxis } from 'recharts';
 
 function formatDate(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
-}
-
-function getDoctorName(id: string): string {
-  return demoDoctors.find(d => d.id === id)?.name || 'Unknown';
 }
 
 function getSeverityBadge(severity: string) {
@@ -69,7 +61,9 @@ const Sparkline = ({ data }: { data: any[] }) => (
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const { patient, conditions, medications, labTrends, healthEvents } = usePatientRecord();
+  const { patient, conditions, medications, labTrends, healthEvents, doctors, allergies } = usePatientRecord();
+
+  const getDoctorName = (id: string) => doctors?.find(d => d.id === id)?.name || 'Unknown';
 
   const metrics = [
     { name: 'HbA1c', data: labTrends.find(t => t.parameter.toLowerCase().includes('hba1c')) || labTrends[0], latest: (labTrends.find(t => t.parameter.toLowerCase().includes('hba1c')) || labTrends[0])?.data.slice(-1)[0] },
@@ -187,10 +181,10 @@ export default function Dashboard() {
         <div className="card card-hover p-5 cursor-pointer" onClick={() => navigate('/timeline')}>
           <div className="flex justify-between items-center mb-4">
             <h3 className="font-semibold text-gray-800">Allergies</h3>
-            <span className="badge-red">{demoAllergies.length}</span>
+            <span className="badge-red">{allergies?.length || 0}</span>
           </div>
           <div className="space-y-3">
-            {demoAllergies.map(a => (
+            {(allergies || []).map(a => (
               <div key={a.id} className="flex justify-between items-start border-b border-gray-100 last:border-0 pb-2 last:pb-0">
                 <div>
                   <div className="font-medium text-sm text-gray-800">{a.allergen}</div>

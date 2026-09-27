@@ -34,7 +34,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       // Simulate network delay
       await new Promise((resolve) => setTimeout(resolve, 600));
 
-      const user = authService.authenticateUser(credentials);
+      const user = await authService.authenticateUser(credentials);
 
       if (user) {
         const session = authService.createSession(user);

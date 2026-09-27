@@ -30,7 +30,6 @@ import {
   SymptomRetrievalResult,
   EvidenceCategory
 } from '@/services/symptomRetrieval';
-import { demoDoctors } from '@/data/patient';
 
 function formatDate(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString('en-IN', {

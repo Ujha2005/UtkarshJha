@@ -1,6 +1,6 @@
-import { User, LoginCredentials, AuthSession } from './authTypes';
+import { User, LoginCredentials, AuthSession, IAuthService } from './authTypes';
 
-// DEMO ONLY: In a real production application, this would use JWT, OAuth, or session cookies
+// DEMO ONLY: In a real production application, this would use JWT, OAuth 2.0 / OIDC, or session cookies
 // and credentials would NEVER be hardcoded on the client side.
 
 export const DEMO_ACCOUNTS: User[] = [
@@ -42,18 +42,17 @@ export const DEMO_ACCOUNTS: User[] = [
 
 const DEMO_PASSWORD = 'demo123';
 
-export const authService = {
-  authenticateUser: (credentials: LoginCredentials): User | null => {
-    // Demo authentication check
+export class DemoAuthService implements IAuthService {
+  public authenticateUser(credentials: LoginCredentials): User | null {
     if (credentials.password !== DEMO_PASSWORD) {
       return null;
     }
 
     const user = DEMO_ACCOUNTS.find((u) => u.username === credentials.username);
     return user || null;
-  },
+  }
 
-  createSession: (user: User): AuthSession => {
+  public createSession(user: User): AuthSession {
     const now = new Date();
     // 30 minutes session expiry
     const expiresAt = new Date(now.getTime() + 30 * 60 * 1000);
@@ -64,21 +63,23 @@ export const authService = {
       expiresAt: expiresAt.toISOString(),
       sessionId: `sess_${Math.random().toString(36).substring(2, 9)}_${now.getTime()}`,
     };
-  },
+  }
 
-  isSessionExpired: (session: AuthSession | null): boolean => {
+  public isSessionExpired(session: AuthSession | null): boolean {
     if (!session) return true;
     const now = new Date();
     const expiresAt = new Date(session.expiresAt);
     return now > expiresAt;
-  },
+  }
 
-  getDemoAccounts: () => {
+  public getDemoAccounts(): { id: string; username: string; displayName: string; role: User['role'] }[] {
     return DEMO_ACCOUNTS.map(({ id, username, displayName, role }) => ({
       id,
       username,
       displayName,
       role,
     }));
-  },
-};
+  }
+}
+
+export const authService: IAuthService = new DemoAuthService();

@@ -21,7 +21,6 @@ import {
 } from 'lucide-react';
 import { usePatientRecord } from '@/context/PatientRecordContext';
 import { generateSeniorMedicineSchedulePDF } from '@/services/pdfGenerator';
-import { demoDoctors } from '@/data/patient';
 
 function formatDateReadable(dateStr: string): string {
   try {
@@ -43,7 +42,8 @@ export default function SeniorModePage() {
     medications,
     labTrends,
     reports,
-    ingestedDocuments
+    ingestedDocuments,
+    doctors
   } = usePatientRecord();
 
   // Active medications only for senior display
@@ -258,7 +258,7 @@ export default function SeniorModePage() {
                 </div>
 
                 <div className="text-xs text-gray-500 pt-1 flex justify-between">
-                  <span>Prescribed by: Dr. {demoDoctors.find(d => d.id === med.prescribedBy)?.name.replace('Dr. ', '') || 'Physician'}</span>
+                  <span>Prescribed by: Dr. {doctors?.find(d => d.id === med.prescribedBy)?.name.replace('Dr. ', '') || 'Physician'}</span>
                   <span>Started: {formatDateReadable(med.startDate)}</span>
                 </div>
               </div>
@@ -341,7 +341,7 @@ export default function SeniorModePage() {
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {demoDoctors.slice(0, 4).map(doc => (
+          {(doctors || []).slice(0, 4).map(doc => (
             <div
               key={doc.id}
               className="bg-white border-2 border-gray-200 rounded-3xl p-5 shadow-sm space-y-2"

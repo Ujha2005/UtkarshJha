@@ -18,14 +18,9 @@ import {
 
 import { usePatientRecord } from '@/context/PatientRecordContext';
 import {
-  demoHealthEvents,
-  demoConditions,
-  demoMedications,
   demoLabTests,
   demoProcedures,
-  demoDoctors,
   demoSymptoms,
-  demoReports
 } from '@/data/patient';
 
 import type {
@@ -42,14 +37,6 @@ function formatDate(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
-function getDoctorName(id: string): string {
-  return demoDoctors.find(d => d.id === id)?.name || '';
-}
-
-function getDoctorById(id: string): Doctor | undefined {
-  return demoDoctors.find(d => d.id === id);
-}
-
 const eventTypeConfig: Record<string, { label: string; color: string; bgColor: string; badgeClass: string; icon: any }> = {
   diagnosis: { label: 'Diagnosis', color: 'text-red-500', bgColor: 'bg-red-50', badgeClass: 'badge-red', icon: Stethoscope },
   lab_test: { label: 'Lab Test', color: 'text-amber-500', bgColor: 'bg-amber-50', badgeClass: 'badge-amber', icon: FlaskConical },
@@ -61,10 +48,18 @@ const eventTypeConfig: Record<string, { label: string; color: string; bgColor: s
 
 export default function TimelinePage() {
   const navigate = useNavigate();
-  const { healthEvents, conditions, medications } = usePatientRecord();
+  const { healthEvents, conditions, medications, doctors, reports, symptoms } = usePatientRecord();
   const [filterType, setFilterType] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedEvent, setSelectedEvent] = useState<HealthEvent | null>(null);
+
+  const getDoctorName = (id: string): string => {
+    return doctors?.find(d => d.id === id)?.name || '';
+  };
+
+  const getDoctorById = (id: string): Doctor | undefined => {
+    return doctors?.find(d => d.id === id);
+  };
 
   const filteredEvents = useMemo(() => {
     let events = [...healthEvents];
@@ -109,8 +104,8 @@ export default function TimelinePage() {
   const getRelatedEntityDetails = (event: HealthEvent) => {
     if (!event.relatedEntityId) return null;
     const id = event.relatedEntityId;
-    if (id.startsWith('c')) return { type: 'Condition', data: conditions.find(c => c.id === id) || demoConditions.find(c => c.id === id) };
-    if (id.startsWith('m')) return { type: 'Medication', data: medications.find(m => m.id === id) || demoMedications.find(m => m.id === id) };
+    if (id.startsWith('c')) return { type: 'Condition', data: conditions.find(c => c.id === id) };
+    if (id.startsWith('m')) return { type: 'Medication', data: medications.find(m => m.id === id) };
     if (id.startsWith('lt_')) return { type: 'Lab Test', data: demoLabTests.find(l => l.id === id) };
     if (id.startsWith('pr')) return { type: 'Procedure', data: demoProcedures.find(p => p.id === id) };
     if (id.startsWith('s')) return { type: 'Symptom', data: demoSymptoms.find(s => s.id === id) };
@@ -346,7 +341,7 @@ export default function TimelinePage() {
             
             <div className="p-4 bg-white border-t flex items-center gap-3">
               {(() => {
-                const matchedReport = demoReports.find(
+                const matchedReport = reports.find(
                   r => r.relatedEventId === selectedEvent.id || r.date === selectedEvent.date
                 );
                 if (matchedReport) {

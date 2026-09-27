@@ -1,48 +1,66 @@
-# Production Readiness & Migration Path
+# CAREGRAPH — Production Readiness & Migration Roadmap
 
-## Overview
-CAREGRAPH is currently a high-fidelity front-end demonstration. To deploy this application to production, specifically for handling Protected Health Information (PHI), a significant backend engineering effort is required.
+> **Notice**: This roadmap outlines the transition from the Phase 9 architecture foundation to a live clinical environment.
+> - `[IMPLEMENTED]`: Completed in Phases 8 & 9
+> - `[ARCHITECTURAL FOUNDATION]`: Abstract interfaces, error classes, mapping functions, and test harness in place
+> - `[REQUIRES PRODUCTION BACKEND]`: Cloud infrastructure provisioning and legal compliance certifications
 
-## Current Demo State vs Production Requirements
-- **State**: In-memory React context.
-- **Requirement**: Persistent, encrypted RDBMS (PostgreSQL) + Backend API.
-- **Auth**: Mock local state.
-- **Requirement**: OAuth 2.0 / OIDC integrated Identity Provider.
-- **Hosting**: Static site generation.
-- **Requirement**: Secure CDN + Backend server cluster (e.g., Kubernetes or AWS ECS).
+---
 
-## Migration Checklist
-- [ ] **Authentication**: Replace mock auth with OAuth 2.0/OIDC (Auth0, Okta, etc.).
-- [ ] **Backend API**: Deploy a secure backend API server (Node.js, Go, or Python).
-- [ ] **Database**: Set up PostgreSQL or a similar RDBMS.
-- [ ] **Encryption**: Implement TLS/mTLS for in-transit, and AES-256 for data at rest.
-- [ ] **CORS**: Configure strict Cross-Origin Resource Sharing (CORS) policies.
-- [ ] **Rate Limiting**: Add rate limiting to all public-facing endpoints.
-- [ ] **Monitoring**: Set up monitoring and alerting (Datadog, New Relic).
-- [ ] **Audit Logging**: Implement proper append-only audit log persistence.
-- [ ] **Backups**: Set up automated backups and disaster recovery protocols.
-- [ ] **Security Audit**: Conduct a full penetration test by a qualified third-party team.
-- [ ] **Compliance**: Perform a regulatory compliance review (HIPAA/GDPR assessment).
+## 1. Phase 9 Completed Architecture Milestones
 
-## Performance Optimization
-Before production release, the frontend should be optimized:
-- **Code Splitting**: Utilize `React.lazy()` to split dashboard views and heavy charting libraries.
-- **Memoization**: Extensive use of `useMemo` and `useCallback` for complex data grids and timelines to prevent unnecessary re-renders.
-- **Asset Optimization**: Ensure all icons (Lucide) and images are optimally compressed.
+| Milestone | Status | Description |
+|---|:---:|---|
+| **Backend Provider Abstraction** | `[IMPLEMENTED]` | `IBackendProvider` and `ApiClient` decouple presentation from data layers. |
+| **Database Domain Schema** | `[ARCHITECTURAL FOUNDATION]` | Normalized entity models (`DbPatient`, `DbCondition`, `DbObservation`, etc.) in `apiTypes.ts`. |
+| **FHIR R4 Mapping Layer** | `[IMPLEMENTED]` | Bidirectional conversion functions for Patient, Condition, Observation, MedicationRequest, DiagnosticReport, DocumentReference, AllergyIntolerance. |
+| **Pluggable Authentication Interface** | `[IMPLEMENTED]` | `IAuthService` decouples `DemoAuthService` from future OIDC providers. |
+| **Runtime Mode Abstraction** | `[IMPLEMENTED]` | `VITE_CAREGRAPH_MODE` cleanly separates synthetic demo from production boundaries. |
+| **Automated Test Suite** | `[IMPLEMENTED]` | Vitest test harness with 43 automated unit tests across 7 test suites. |
+| **PatientRecordContext Decoupling** | `[IMPLEMENTED]` | React context consumes `ApiClient` with zero direct imports from static demo files. |
 
-## Deployment Architecture
+---
+
+## 2. Production Deployment Migration Checklist
+
+### 2.1 Backend Services & API Gateway [REQUIRES PRODUCTION BACKEND]
+- [ ] Deploy containerized API gateway (FastAPI / NestJS / Go) behind Envoy or Kong.
+- [ ] Implement `HttpBackendProvider` in frontend to communicate with API endpoints over TLS 1.3.
+- [ ] Configure strict CORS rules (`Access-Control-Allow-Origin: https://app.caregraph.health`).
+- [ ] Implement token bucket rate limiting (WAF / Cloudflare) to prevent brute force and denial of service.
+
+### 2.2 Identity & Access Management [REQUIRES PRODUCTION BACKEND]
+- [ ] Replace `DemoAuthService` with `OidcAuthService` using Keycloak, Auth0, or AWS Cognito.
+- [ ] Enforce Authorization Code Flow with PKCE for single-page application security.
+- [ ] Mandate Multi-Factor Authentication (TOTP / FIDO2 WebAuthn) for all clinical and administrative roles.
+- [ ] Store session refresh tokens in `HttpOnly`, `Secure`, `SameSite=Strict` cookies.
+
+### 2.3 Database & Storage Infrastructure [REQUIRES PRODUCTION BACKEND]
+- [ ] Provision managed PostgreSQL 16 cluster with TimescaleDB extension for time-series lab observations.
+- [ ] Enable Transparent Data Encryption (TDE) with customer-managed keys via AWS KMS / HashiCorp Vault.
+- [ ] Provision AWS S3 bucket with Object Lock compliance mode (WORM) and ClamAV quarantine scanning for uploaded documents.
+- [ ] Configure automated daily encrypted snapshots with cross-region replication and point-in-time recovery (PITR).
+
+### 2.4 Audit & Compliance [REQUIRES PRODUCTION BACKEND]
+- [ ] Stream audit log entries to append-only, tamper-evident SIEM (AWS CloudTrail / Google Cloud Audit Logs).
+- [ ] Complete formal third-party SOC 2 Type II, HIPAA Security Rule, and India DPDP Act compliance audits.
+- [ ] Conduct independent penetration testing and dynamic application security testing (DAST).
+
+---
+
+## 3. Production Infrastructure Topology
+
 ```mermaid
 flowchart TD
-    User --> WAF[Web Application Firewall]
-    WAF --> CDN[CDN / Static Assets]
-    WAF --> LB[Load Balancer]
-    LB --> API[Backend API Cluster]
-    API --> DB[(Primary DB - Encrypted)]
-    DB --> Replica[(Read Replica)]
-    API --> Redis[(Session Cache)]
-    API --> S3[Secure Blob Storage]
+    User["Clinician / Patient Client (Browser)"] 
+    --> WAF["Cloudflare / AWS WAF (DDoS & Rate Limiting)"]
+    WAF --> CDN["CloudFront CDN (Static Assets: Vite / React)"]
+    WAF --> LB["Application Load Balancer (TLS 1.3 Termination)"]
+    LB --> API["FastAPI / NestJS Backend Cluster (Kubernetes / ECS)"]
+    
+    API <--> IdP["Identity Provider (Keycloak / OAuth2 OIDC)"]
+    API <--> DB[("PostgreSQL 16 + TimescaleDB (Encrypted AES-256)")]
+    API <--> S3[("AWS S3 Vault (SSE-KMS Encrypted Clinical Documents)")]
+    API --> SIEM[("CloudTrail / Datadog (Immutable Audit Trail)")]
+    API <--> AI["Private Model Inference Gateway (No Public Web APIs)"]
 ```
-
-## Monitoring and Observability
-- Distributed tracing must be implemented to track requests from the frontend, through the API, to the database.
-- Centralized logging is required to capture application errors without exposing PII in the stack traces.

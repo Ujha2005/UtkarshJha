@@ -32,7 +32,6 @@ import {
 } from 'lucide-react';
 import { usePatientRecord } from '@/context/PatientRecordContext';
 import { generateDoctorSummaryPDF } from '@/services/pdfGenerator';
-import { demoDoctors, demoAllergies } from '@/data/patient';
 import type { Condition, Medication, LabTrend, Report, HealthEvent, Patient, Allergy } from '@/types';
 
 function formatDate(dateStr: string): string {
@@ -41,10 +40,6 @@ function formatDate(dateStr: string): string {
     month: 'short',
     year: 'numeric'
   });
-}
-
-function getDoctorName(id: string): string {
-  return demoDoctors.find(d => d.id === id)?.name || id;
 }
 
 export interface DoctorSummaryObject {
@@ -78,8 +73,12 @@ export default function DoctorModePage() {
     reports,
     healthEvents,
     nutritionEntries,
-    ingestedDocuments
+    ingestedDocuments,
+    doctors,
+    allergies
   } = usePatientRecord();
+
+  const getDoctorName = (id: string) => doctors?.find(d => d.id === id)?.name || id;
 
   // Filters
   const [timelineFilter, setTimelineFilter] = useState<string>('all');
@@ -142,7 +141,7 @@ export default function DoctorModePage() {
     return {
       generatedAt: new Date().toISOString(),
       patient,
-      allergies: demoAllergies,
+      allergies: allergies || [],
       activeConditions,
       currentMedications: activeMeds,
       historicalMedications: historicalMeds,
@@ -246,7 +245,7 @@ export default function DoctorModePage() {
               Documented Allergies & Drug Adverse Reactions
             </span>
             <div className="flex flex-wrap gap-2">
-              {demoAllergies.map(a => (
+              {(allergies || []).map(a => (
                 <span
                   key={a.id}
                   className="px-2.5 py-1 rounded-md bg-red-950/80 border border-red-800 text-red-200 font-semibold flex items-center gap-1"

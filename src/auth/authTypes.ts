@@ -39,3 +39,10 @@ export interface AuthContextType {
   hasRole: (role: UserRole | UserRole[]) => boolean;
   isSessionValid: () => boolean;
 }
+
+export interface IAuthService {
+  authenticateUser(credentials: LoginCredentials): Promise<User | null> | User | null;
+  createSession(user: User): AuthSession;
+  isSessionExpired(session: AuthSession | null): boolean;
+  getDemoAccounts(): { id: string; username: string; displayName: string; role: UserRole }[];
+}

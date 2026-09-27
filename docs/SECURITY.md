@@ -1,47 +1,51 @@
-# CAREGRAPH Security Architecture
+# CAREGRAPH — Security Architecture & Production Boundary
 
-**DISCLAIMER: This is a demonstration platform. It does NOT provide legal compliance with HIPAA, GDPR, DPDP Act, or any other regulatory framework. All data is synthetic and resides strictly in memory for demonstration purposes.**
+> **DISCLAIMER**: CAREGRAPH is a healthcare technology demonstration and architecture framework using synthetic patient records. **It does NOT provide legal compliance with HIPAA, GDPR, or India's DPDP Act** without full deployment on production cloud infrastructure featuring certified hardware security modules, enterprise IdP, audited key management, and third-party penetration testing.
 
-## Overview
-CAREGRAPH is designed with a security-first mindset, modeling how a modern, secure Electronic Health Record (EHR) system should operate. In this Phase 8 release, the application acts as a client-side only demonstration that explicitly distinguishes between its current demo state and the necessary requirements for a production-grade medical application.
+---
 
-## Authentication Model (Demo vs Production)
-- **Demo Mode**: The application uses mock authentication mechanisms to simulate user login. Credentials are not stored persistently, and session state is maintained solely in React state.
-- **Production Mode**: A production deployment requires a robust Identity Provider (IdP) supporting OpenID Connect (OIDC) or OAuth 2.0 (e.g., Auth0, Okta, or a custom IdentityServer). 
+## 1. Security Tenets
 
-## Role-Based Access Control (RBAC)
-CAREGRAPH implements strict RBAC with the following primary roles:
-- **PATIENT**: Can view their own records, manage consent, and grant access to caregivers or doctors.
-- **DOCTOR**: Can view records of patients who have granted them access, add clinical notes, and prescribe medications.
-- **CAREGIVER**: Can view specific sections of a patient's record based on granular access grants.
-- **ADMIN**: Has systemic oversight, can view audit logs, and manage system configurations (cannot view clinical data without explicit break-glass consent).
+1. **Explicit Trust Boundaries**: The browser client is an untrusted environment. All security, authentication, and authorization decisions must be validated at the backend boundary.
+2. **Zero Storage of Credentials**: No credentials, passwords, or persistent authorization tokens are ever stored in `localStorage` or `sessionStorage`.
+3. **Audit Trail Completeness**: Every clinical read, export, document upload, and consent modification emits an immutable, structured audit event.
+4. **No Direct Third-Party LLM Calls**: AI inference operations are executed strictly behind an authenticated backend proxy to prevent client-side credential exposure and prompt injection.
 
-## Session Management Approach
-Sessions in the demo are ephemeral. In a production environment:
-- Secure, HttpOnly, SameSite cookies must be used to store refresh tokens.
-- Short-lived JWT access tokens should be used for API requests.
-- Absolute session timeouts and idle timeouts must be strictly enforced (e.g., 15-minute idle timeout).
+---
 
-## Data Protection Principles
-- **Least Privilege**: Users only see what their role and active grants permit.
-- **Encryption**: Production architectures must encrypt data at rest (AES-256) and in transit (TLS 1.2+).
-- **Anonymization**: All AI/LLM requests in production must strip Personally Identifiable Information (PII) before transmission.
+## 2. Security Capabilities Comparison
 
-## Client-Side Only Architecture Limitations
-Currently, all logic runs in the browser. This means:
-1. "Security" is purely UI-enforced. A user with developer tools could bypass UI restrictions.
-2. Data is not persisted across browser refreshes unless mocked in local storage.
-3. True security requires a Backend-for-Frontend (BFF) or a traditional API gateway to enforce authorization rules server-side.
+| Security Capability | Status | Implementation Details |
+|---|:---:|---|
+| **Role-Based Access Control** | `[IMPLEMENTED]` | `RoleGuard` and `ProtectedRoute` enforce role separation (Patient, Doctor, Caregiver, Admin) in UI. |
+| **Server-Side Authorization Rules**| `[ARCHITECTURAL FOUNDATION]` | Defined in `docs/AUTHORIZATION.md`. Client maps 401, 403, 404 with typed `ApiError` hierarchy. |
+| **API Error Sanitization** | `[IMPLEMENTED]` | `ApiError` classes (`src/services/api/errors.ts`) sanitize messages; stack traces never leak to client. |
+| **In-Memory Session Security** | `[IMPLEMENTED]` | Sessions stored in memory with 30-min auto-inactivity timeout and `SESSION_EXPIRED` audit logging. |
+| **Audit Ledger Ring Buffer** | `[IMPLEMENTED]` | 1,000-entry in-memory ring buffer (`auditLog.ts`) logging 18 distinct security and clinical event types. |
+| **Dynamic Consent Directives** | `[IMPLEMENTED]` | 5 toggleable patient directives (`consentService.ts`) with real-time audit event generation. |
+| **Document Checksum & Provenance** | `[IMPLEMENTED]` | SHA-256 checksums and `sourceDocumentId` provenance links on all extracted entities. |
+| **Document Storage Encryption** | `[REQUIRES PRODUCTION BACKEND]` | AWS KMS Customer-Managed Keys (SSE-KMS) with AES-256-GCM envelope encryption. |
+| **OAuth 2.0 / OIDC with PKCE** | `[REQUIRES PRODUCTION BACKEND]` | Keycloak / Auth0 identity provider with HttpOnly, Secure, SameSite=Strict cookies. |
+| **Immutable SIEM Logging** | `[REQUIRES PRODUCTION BACKEND]` | Append-only streaming to AWS CloudTrail / Datadog with tamper-evident HMAC signatures. |
 
-## Implemented vs Needed for Production
-### Implemented (Demo)
-- UI-based RBAC simulation
-- Mock audit logging of user actions
-- Simulated access grants and consent revocations
-- Synthetic data generation
+---
 
-### Needed for Production
-- Server-side authorization enforcement
-- Persistent, encrypted database
-- Hardware Security Modules (HSM) for key management
-- Comprehensive penetration testing and compliance audits
+## 3. Cryptographic Provenance & Transport Security
+
+### 3.1 Data in Transit [REQUIRES PRODUCTION BACKEND]
+- Enforced **TLS 1.3** across all public API routes with HSTS (`Strict-Transport-Security: max-age=63072000; includeSubDomains; preload`).
+- Mutual TLS (mTLS) for inter-service communication between API gateways and FHIR repository microservices.
+
+### 3.2 Data at Rest [REQUIRES PRODUCTION BACKEND]
+- Database tables (PostgreSQL) encrypted using **AES-256-XTS** via transparent data encryption.
+- Highly sensitive fields (national identifiers, psychiatric notes) utilize application-layer field-level encryption with keys rotated annually via HashiCorp Vault.
+
+### 3.3 Secure HTTP Response Headers [REQUIRES PRODUCTION BACKEND]
+```http
+Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://api.caregraph.health;
+X-Content-Type-Options: nosniff
+X-Frame-Options: DENY
+X-XSS-Protection: 1; mode=block
+Referrer-Policy: strict-origin-when-cross-origin
+Permissions-Policy: geolocation=(), camera=(), microphone=()
+```
